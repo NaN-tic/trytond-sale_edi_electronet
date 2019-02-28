@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<!-- The COPYRIGHT file at the top level of this repository contains the full
+     copyright notices and license terms. -->
+<data>
+    <xpath expr="/form" position="inside">
+        <newline/>
+        <separator id="edi" string="EDI" colspan="4"/>
+        <label name="edi_source_path"/>
+        <field name="edi_source_path"/>
+        <newline/>
+        <label name="edi_errors_path"/>
+        <field name="edi_errors_path"/>
+    </xpath>
+</data>

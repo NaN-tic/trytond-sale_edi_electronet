@@ -1,0 +1,31 @@
+#
+msgid ""
+msgstr "Content-Type: text/plain; charset=utf-8\n"
+
+msgctxt "field:sale.configuration,edi_errors_path:"
+msgid "Errors Path"
+msgstr "Directorio errores"
+
+msgctxt "field:sale.configuration,edi_source_path:"
+msgid "Source Path"
+msgstr "Directorio de origen"
+
+msgctxt "field:sale.sale,edi_order_file:"
+msgid "EDI Order File"
+msgstr "Ficher Orden EDI"
+
+msgctxt "model:ir.cron,name:cron_create_edi_orders"
+msgid "Create EDI Orders"
+msgstr "Crear Ordenes EDI"
+
+msgctxt "model:res.user,name:user_create_edi_orders"
+msgid "Cron Create EDI Orders"
+msgstr "Cron Crear Ordenes EDI"
+
+msgctxt "view:sale.configuration:"
+msgid "EDI"
+msgstr "EDI"
+
+msgctxt "view:sale.sale:"
+msgid "EDI"
+msgstr "EDI"

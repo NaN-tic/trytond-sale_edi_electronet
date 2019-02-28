@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<!-- The COPYRIGHT file at the top level of this repository contains the full
+     copyright notices and license terms. -->
+<tryton>
+    <data>
+        <!-- sale.sale -->
+        <record model="ir.ui.view" id="sale_view_form">
+            <field name="model">sale.sale</field>
+            <field name="inherit" ref="sale.sale_view_form"/>
+            <field name="name">sale_form</field>
+        </record>
+        <!-- create EDI orders cron -->
+        <record model="res.user" id="user_create_edi_orders">
+            <field name="login">user_cron_create_edi_orders</field>
+            <field name="name">Cron Create EDI Orders</field>
+            <field name="signature"></field>
+            <field name="active" eval="False"/>
+        </record>
+        <record model="res.user-res.group"
+            id="user_create_edi_orders_group_admin">
+            <field name="user" ref="user_create_edi_orders"/>
+            <field name="group" ref="res.group_admin"/>
+        </record>
+        <record model="ir.cron" id="cron_create_edi_orders">
+            <field name="name">Create EDI Orders</field>
+            <field name="request_user" ref="res.user_admin"/>
+            <field name="user" ref="user_create_edi_orders"/>
+            <field name="active" eval="True"/>
+            <field name="interval_number" eval="1"/>
+            <field name="interval_type">days</field>
+            <field name="number_calls" eval="-1"/>
+            <field name="repeat_missed" eval="False"/>
+            <field name="model">sale.sale</field>
+            <field name="function">get_sales_from_edi_files_cron</field>
+        </record>
+    </data>
+</tryton>

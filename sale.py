@@ -54,19 +54,18 @@ def with_segment_check(func, *args):
         cls._validate_segment(segment.elements, template)
     except MissingFieldsError:
         serialized_segment = serializer.serialize([segment])
-        msg = u'Some field is missing in segment'
-        return DO_NOTHING, [u'{}: {}'.format(msg, serialized_segment)]
+        msg = 'Some field is missing in segment'
+        return DO_NOTHING, ['{}: {}'.format(msg, serialized_segment)]
     except IncorrectValueForField:
         serialized_segment = serializer.serialize([segment])
         msg = 'Incorrect value for field in segment'
-        return DO_NOTHING, [u'{}: {}'.format(msg, unicode(serialized_segment))]
+        return DO_NOTHING, ['{}: {}'.format(msg, str(serialized_segment))]
     else:
         return func(cls, segment, template)
 
 
-class Sale:
+class Sale(metaclass=PoolMeta):
     __name__ = 'sale.sale'
-    __metaclass__ = PoolMeta
 
     edi_order_file = fields.Binary('EDI Order File', states={
             'readonly': True,
@@ -97,13 +96,13 @@ class Sale:
         values = {}
         for segment in header:
             # Ignore the tags we not use
-            if segment.tag not in template['header'].keys():
+            if segment.tag not in list(template['header'].keys()):
                 continue
             template_segment = template['header'].get(segment.tag)
             # Segment ALI has a special management, it doesn't provides
             # any value for the sale but defines if the sale will be created
             # if some requested products can't not be selled.
-            if segment.tag == u'ALI':
+            if segment.tag == 'ALI':
                 discard_if_partial_sale, errors = cls._process_ALI(
                     segment, template)
                 if errors:
@@ -124,7 +123,7 @@ class Sale:
             return None, total_errors
 
         sale = cls()
-        for k, v in values.iteritems():
+        for k, v in values.items():
             setattr(sale, k, v)
         sale.on_change_shipment_party()
         sale.on_change_party()
@@ -132,7 +131,7 @@ class Sale:
         for linegroup in detail:
             values = {}
             for segment in linegroup:
-                if segment.tag not in template['detail'].keys():
+                if segment.tag not in list(template['detail'].keys()):
                     continue
                 template_segment = template['detail'].get(segment.tag)
                 process = eval('cls._process_{}'.format(segment.tag))
@@ -162,9 +161,9 @@ class Sale:
         if len(template_segment_elements) > len(elements):
             raise MissingFieldsError
         for index, item in enumerate(template_segment_elements):
-            if item == u'!ignore':
+            if item == '!ignore':
                 continue
-            elif item == u'!value':
+            elif item == '!value':
                 if not elements[index]:
                     raise IncorrectValueForField
             elif isinstance(item, list):
@@ -206,7 +205,7 @@ class Sale:
                 limit=1)
             if not identifier:
                 serialized_segment = serializer.serialize([segment])
-                msg = u'Party not found'
+                msg = 'Party not found'
                 return DO_NOTHING, ['{}: {}'.format(msg, serialized_segment)]
             party = identifier[0].party
             return {'shipment_party': party, 'party': party}, NO_ERRORS
@@ -223,7 +222,7 @@ class Sale:
         currency = Currency.search([('code', '=', currency_code)], limit=1)
         if not currency:
             serialized_segment = serializer.serialize([segment])
-            msg = u'Currency not found'
+            msg = 'Currency not found'
             return DO_NOTHING, ['{}: {}'.format(msg, serialized_segment)]
         currency, = currency
         return {'currency': currency}, NO_ERRORS
@@ -240,9 +239,9 @@ class Sale:
             serializer = Serializer()
             serialized_segment = serializer.serialize([segment])
             msg = 'Incorrect value for field in segment'
-            return DO_NOTHING, [u'{}: {}'.format(
+            return DO_NOTHING, ['{}: {}'.format(
                     msg,
-                    unicode(serialized_segment))]
+                    str(serialized_segment))]
         else:
             code = segment.elements[1][0]
             product = Product.search([('code', '=', code)], limit=1)
@@ -250,9 +249,9 @@ class Sale:
                 serializer = Serializer()
                 serialized_segment = serializer.serialize([segment])
                 msg = 'No product found in segment'
-                return DO_NOTHING, [u'{}: {}'.format(
+                return DO_NOTHING, ['{}: {}'.format(
                     msg,
-                    unicode(serialized_segment))]
+                    str(serialized_segment))]
             return {'product': product[0].id}, NO_ERRORS
 
     @classmethod
@@ -260,7 +259,7 @@ class Sale:
     def _process_QTY(cls, segment, template):
         pool = Pool()
         Uom = pool.get('product.uom')
-        uom_value = UOMS_EDI_TO_TRYTON.get(segment.elements[0][-1], u'u')
+        uom_value = UOMS_EDI_TO_TRYTON.get(segment.elements[0][-1], 'u')
         uom, = Uom.search([('symbol', '=', uom_value)], limit=1)
         quantity = float(segment.elements[0][2])
         return {'unit': uom, 'quantity': quantity}, NO_ERRORS
@@ -325,7 +324,7 @@ class Sale:
                 edi_file = fp.read()
             try:
                 sale, errors = cls.create_sale_from_edi_file(
-                    edi_file.encode('utf-8'), template)
+                    str(edi_file, 'utf-8'), template)
             except RuntimeError:
                 continue
             else:
@@ -355,14 +354,13 @@ class Sale:
         return True
 
 
-class SaleLine:
+class SaleLine(metaclass=PoolMeta):
     __name__ = 'sale.line'
-    __metaclass__ = PoolMeta
 
     def set_fields_value(self, values):
         """
         Set SaleLine fields values from a given dict
         """
-        for k, v in values.iteritems():
+        for k, v in values.items():
             setattr(self, k, v)
         return self

@@ -8,8 +8,7 @@ from trytond.pool import PoolMeta
 __all__ = ['SaleConfiguration']
 
 
-class SaleConfiguration:
-    __metaclass__ = PoolMeta
+class SaleConfiguration(metaclass=PoolMeta):
     __name__ = 'sale.configuration'
 
     edi_source_path = fields.Char('Source Path')
@@ -17,8 +16,8 @@ class SaleConfiguration:
 
     @staticmethod
     def default_edi_source_path():
-        return u'/tmp/'
+        return '/tmp/'
 
     @staticmethod
     def default_edi_errors_path():
-        return u'/tmp/'
+        return '/tmp/'

@@ -290,6 +290,7 @@ class TestCase(ModuleTestCase):
         ProductUom = pool.get('product.uom')
         ProductTemplate = pool.get('product.template')
         Product = pool.get('product.product')
+        ProductCategory = pool.get('product.category')
         Tax = pool.get('account.tax')
         Sale = pool.get('sale.sale')
         SaleConfig = pool.get('sale.configuration')
@@ -325,11 +326,14 @@ class TestCase(ModuleTestCase):
             sale_cfg.edi_source_path = os.path.abspath(TEST_FILES_DIR)
             sale_cfg.save()
             unit, = ProductUom.search([('name', '=', 'Unit')], limit=1)
-            product = Product()
+            category = ProductCategory(name='test account used',
+                account_expense=expense, accounting=True)
+            category.save()
             template = ProductTemplate()
             template.name = 'product'
             template.default_uom = unit
             template.type = 'goods'
+            template.account_category = category
             template.purchasable = True
             template.salable = True
             template.list_price = Decimal('10')
@@ -339,18 +343,19 @@ class TestCase(ModuleTestCase):
             template.account_revenue = revenue
             template.sale_uom = unit
             template.save()
+            product = Product()
             product.template = template
             product.code = '67310'
             product.save()
             sales = Sale.get_sales_from_edi_files()
             self.assertTrue(sales)
             sale = sales[0]
-            self.assertEquals(sale.payment_term, term)
-            self.assertEquals(sale.shipment_party, customer)
-            self.assertEquals(sale.party, customer)
+            self.assertEqual(sale.payment_term, term)
+            self.assertEqual(sale.shipment_party, customer)
+            self.assertEqual(sale.party, customer)
             self.assertTrue(sale.lines)
             line = sale.lines[0]
-            self.assertEquals(line.product.code, product.code)
+            self.assertEqual(line.product.code, product.code)
             os.rmdir(TEST_FILES_DIR)
 
 

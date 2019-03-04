@@ -197,7 +197,7 @@ class Sale(metaclass=PoolMeta):
         serializer = Serializer()
         pool = Pool()
         PartyIdentifier = pool.get('party.identifier')
-        if segment.elements[0] in ('DP', 'BY'):
+        if segment.elements[0] in ('MS',):
             edi_operational_point = segment.elements[1][0]
             identifier = PartyIdentifier.search([
                     ('type', '=', 'edi'),

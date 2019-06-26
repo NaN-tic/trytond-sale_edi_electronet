@@ -39,20 +39,28 @@ class TestCase(ModuleTestCase):
                 self.assertEqual(len(fiscalyear.periods), 12)
             return fiscalyear
 
-    def get_journals(self):
-        pool = Pool()
-        Journal = pool.get('account.journal')
-        return dict((j.code, j) for j in Journal.search([]))
-
     def get_accounts(self, company):
         pool = Pool()
         Account = pool.get('account.account')
-        accounts = Account.search([
-                ('kind', 'in',
-                    ['receivable', 'payable', 'revenue', 'expense']),
-                ('company', '=', company.id),
-                ])
-        accounts = {a.kind: a for a in accounts}
+        accounts = {}
+        accounts['receivable'] = Account.search([
+            ('type.receivable', '=', True),
+            ('company', '=', company.id),
+            ])[0]
+        accounts['payable'] = Account.search([
+            ('type.payable', '=', True),
+            ('company', '=', company.id),
+            ])[0]
+
+        accounts['revenue'] = Account.search([
+            ('type.revenue', '=', True),
+            ('company', '=', company.id),
+            ])[0]
+        accounts['expense'] = Account.search([
+            ('type.expense', '=', True),
+            ('company', '=', company.id),
+            ])[0]
+
         root, = Account.search([
                 ('parent', '=', None),
                 ('company', '=', company.id),
@@ -75,13 +83,11 @@ class TestCase(ModuleTestCase):
             accounts['payable'].code = '41'
             accounts['payable'].save()
         cash, = Account.search([
-                ('kind', '=', 'other'),
                 ('name', '=', 'Main Cash'),
                 ('company', '=', company.id),
                 ], limit=1)
         accounts['cash'] = cash
         tax, = Account.search([
-                ('kind', '=', 'other'),
                 ('name', '=', 'Main Tax'),
                 ('company', '=', company.id),
                 ], limit=1)
@@ -97,7 +103,6 @@ class TestCase(ModuleTestCase):
                 view, = Account.create([{
                             'name': 'View',
                             'code': '1',
-                            'kind': 'view',
                             'parent': root.id,
                             }])
         accounts['view'] = view
@@ -140,134 +145,6 @@ class TestCase(ModuleTestCase):
                     ], limit=1)
         return customer1, customer2, supplier1, supplier2
 
-    def create_moves(self, company, fiscalyear=None, create_chart=True):
-        'Create moves some moves for the test'
-        pool = Pool()
-        Move = pool.get('account.move')
-        fiscalyear = self.create_fiscalyear_and_chart(company, fiscalyear,
-            create_chart)
-        period = fiscalyear.periods[0]
-        last_period = fiscalyear.periods[-1]
-        journals = self.get_journals()
-        journal_revenue = journals['REV']
-        journal_expense = journals['EXP']
-        accounts = self.get_accounts(company)
-        revenue = accounts['revenue']
-        receivable = accounts['receivable']
-        expense = accounts['expense']
-        payable = accounts['payable']
-        # Create some parties
-        if create_chart:
-            customer1, customer2, supplier1, supplier2 = self.create_parties(
-                company)
-        else:
-            customer1, customer2, supplier1, supplier2 = self.get_parties()
-        # Create some moves
-        vlist = [
-            {
-                'company': company.id,
-                'period': period.id,
-                'journal': journal_revenue.id,
-                'date': period.start_date,
-                'lines': [
-                    ('create', [{
-                                'account': revenue.id,
-                                'credit': Decimal(100),
-                                }, {
-                                'party': customer1.id,
-                                'account': receivable.id,
-                                'debit': Decimal(100),
-                                }]),
-                    ],
-                },
-            {
-                'company': company.id,
-                'period': period.id,
-                'journal': journal_revenue.id,
-                'date': period.start_date,
-                'lines': [
-                    ('create', [{
-                                'account': revenue.id,
-                                'credit': Decimal(200),
-                                }, {
-                                'party': customer2.id,
-                                'account': receivable.id,
-                                'debit': Decimal(200),
-                                }]),
-                    ],
-                },
-            {
-                'company': company.id,
-                'period': period.id,
-                'journal': journal_expense.id,
-                'date': period.start_date,
-                'lines': [
-                    ('create', [{
-                                'account': expense.id,
-                                'debit': Decimal(30),
-                                }, {
-                                'party': supplier1.id,
-                                'account': payable.id,
-                                'credit': Decimal(30),
-                                }]),
-                    ],
-                },
-            {
-                'company': company.id,
-                'period': period.id,
-                'journal': journal_expense.id,
-                'date': period.start_date,
-                'lines': [
-                    ('create', [{
-                                'account': expense.id,
-                                'debit': Decimal(50),
-                                }, {
-                                'party': supplier2.id,
-                                'account': payable.id,
-                                'credit': Decimal(50),
-                                }]),
-                    ],
-                },
-            {
-                'company': company.id,
-                'period': last_period.id,
-                'journal': journal_expense.id,
-                'date': last_period.end_date,
-                'lines': [
-                    ('create', [{
-                                'account': expense.id,
-                                'debit': Decimal(50),
-                                }, {
-                                'party': supplier2.id,
-                                'account': payable.id,
-                                'credit': Decimal(50),
-                                }]),
-                    ],
-                },
-            {
-                'company': company.id,
-                'period': last_period.id,
-                'journal': journal_revenue.id,
-                'date': last_period.end_date,
-                'lines': [
-                    ('create', [{
-                                'account': revenue.id,
-                                'credit': Decimal(300),
-                                }, {
-                                'party': customer2.id,
-                                'account': receivable.id,
-                                'debit': Decimal(300),
-                                }]),
-                    ],
-                },
-            ]
-        moves = Move.create(vlist)
-        Move.post(moves)
-        # Set account inactive
-        expense.active = False
-        expense.save()
-        return fiscalyear
-
     def create_payment_term(self):
         PaymentTerm = Pool().get('account.invoice.payment_term')
         term, = PaymentTerm.create([{
@@ -303,7 +180,11 @@ class TestCase(ModuleTestCase):
 
         company = create_company()
         with set_company(company):
-            self.create_moves(company)
+            self.create_fiscalyear_and_chart(company, None,
+                True)
+            # Create some parties
+            customer1, customer2, supplier1, supplier2 = self.create_parties(
+                company)
             accounts = self.get_accounts(company)
             expense = accounts.get('expense')
             revenue = accounts.get('revenue')
@@ -337,7 +218,6 @@ class TestCase(ModuleTestCase):
             template.purchasable = True
             template.salable = True
             template.list_price = Decimal('10')
-            template.cost_price = Decimal('5')
             template.cost_price_method = 'fixed'
             template.account_expense = expense
             template.account_revenue = revenue
@@ -345,6 +225,7 @@ class TestCase(ModuleTestCase):
             template.save()
             product = Product()
             product.template = template
+            product.cost_price = Decimal('5')
             product.code = '67310'
             product.save()
             sales = Sale.get_sales_from_edi_files()

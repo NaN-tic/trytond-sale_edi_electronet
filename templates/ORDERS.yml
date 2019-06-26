@@ -10,8 +10,8 @@ detail:
     PIA: [!!python/tuple ['1','5'], ['!value', '', 'SA']]
     QTY: [['21', '', '!value', !!python/tuple ['', 'KGM', 'LTR', 'MTR', 'UN']]]
     DTM: [['2', '', '!value', '', '102']]
-    #PRI: [['AAB', '', '!value']]
+    PRI: [[!!python/tuple ['AAA', 'AAB', 'INF'], '', '!value']]
     #ALC: ['A', '', '', '', 'TD']
-    #PCD: [['3', '', '!value']]
+    PCD: [['3', '', '!value']]
 resume:
     UNS: ['S']

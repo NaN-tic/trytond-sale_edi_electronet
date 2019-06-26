@@ -10,4 +10,5 @@ def register():
         configuration.SaleConfiguration,
         sale.Sale,
         sale.SaleLine,
+        sale.Cron,
         module='sale_edi', type_='model')

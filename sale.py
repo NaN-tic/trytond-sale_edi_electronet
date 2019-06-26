@@ -3,22 +3,27 @@
 # copyright notices and license terms.
 from trytond.pool import Pool, PoolMeta
 from trytond.model import fields
+from trytond.modules.product import price_digits
 from edifact.message import Message
 from edifact.serializer import Serializer
-from edifact.utils import RewindIterator, rewind
+from edifact.utils import (RewindIterator, with_segment_check,
+    separate_section, validate_segment, DO_NOTHING, NO_ERRORS)
+from edifact.errors import (IncorrectValueForField, MissingFieldsError)
 import oyaml as yaml
 from io import open
 import os
-from decorator import decorator
 from datetime import datetime
+from itertools import chain
+from decimal import Decimal
 
 
-__all__ = ['Sale', 'SaleLine']
+__all__ = ['Sale', 'SaleLine', 'Cron']
 
+ZERO_ = Decimal('0')
+NO_SALE = None
+KNOWN_EXTENSIONS = ['.txt', '.edi', '.pla']
 MODULE_PATH = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_TEMPLATE = 'templates/ORDERS.yml'
-NO_ERRORS = None
-DO_NOTHING = {}
 UOMS_EDI_TO_TRYTON = {
     'KGM': 'kg',
     'LTR': 'l',
@@ -26,43 +31,14 @@ UOMS_EDI_TO_TRYTON = {
     'UN': 'u',
 }
 
+class Cron(metaclass=PoolMeta):
+    __name__ = 'ir.cron'
 
-class EdiError(Exception):
-    pass
-
-
-class MissingFieldsError(EdiError):
-    pass
-
-
-class IncorrectValueForField(EdiError):
-    pass
-
-
-@decorator
-def with_segment_check(func, *args):
-    """
-    This decorator provides a call to the validation of the segment struc
-    against the template.
-    """
-    try:
-        args = list(args)
-        serializer = Serializer()
-        cls = args.pop(0)
-        segment = args.pop(0)
-        template = args.pop(0)
-        cls._validate_segment(segment.elements, template)
-    except MissingFieldsError:
-        serialized_segment = serializer.serialize([segment])
-        msg = 'Some field is missing in segment'
-        return DO_NOTHING, ['{}: {}'.format(msg, serialized_segment)]
-    except IncorrectValueForField:
-        serialized_segment = serializer.serialize([segment])
-        msg = 'Incorrect value for field in segment'
-        return DO_NOTHING, ['{}: {}'.format(msg, str(serialized_segment))]
-    else:
-        return func(cls, segment, template)
-
+    @classmethod
+    def __setup__(cls):
+        super(Cron, cls).__setup__()
+        cls.method.selection.extend([
+            ('sale.sale|get_sales_from_edi_files_cron', 'Create EDI Orders')])
 
 class Sale(metaclass=PoolMeta):
     __name__ = 'sale.sale'
@@ -84,11 +60,19 @@ class Sale(metaclass=PoolMeta):
         template_path = os.path.join(MODULE_PATH, template_name)
         with open(template_path, encoding='utf-8') as fp:
             template = yaml.load(fp.read())
-        message = Message.from_str(edi_file)
-        segments_iterator = RewindIterator(message.segments)
+        message = Message.from_file(edi_file, encoding='utf-8')
+        # If there isn't a segment UNH with ORDERS:D:96A:UN:EAN008
+        # means the file readed it's not a EDI order.
+        unh = message.get_segment('UNH')
+        if (not unh or u"ORDERS:D:96A:UN:EAN008"
+                not in Serializer().serialize([unh])):
+            return NO_SALE, NO_ERRORS
 
-        header = [x for x in cls._separate_header(segments_iterator)]
-        detail = [x for x in cls._separate_detail(segments_iterator)]
+        segments_iterator = RewindIterator(message.segments)
+        header = [x for x in chain(*separate_section(segments_iterator,
+                    end='LIN'))]
+        detail = [x for x in separate_section(segments_iterator, start='LIN',
+                end='UNS')]
         del(segments_iterator)
 
         total_errors = []
@@ -96,7 +80,7 @@ class Sale(metaclass=PoolMeta):
         values = {}
         for segment in header:
             # Ignore the tags we not use
-            if segment.tag not in list(template['header'].keys()):
+            if segment.tag not in template['header'].keys():
                 continue
             template_segment = template['header'].get(segment.tag)
             # Segment ALI has a special management, it doesn't provides
@@ -120,7 +104,7 @@ class Sale(metaclass=PoolMeta):
         # If any header segment could be processed or there isn't a party
         # the sale isn't created
         if not values or not values.get('shipment_party'):
-            return None, total_errors
+            return NO_SALE, total_errors
 
         sale = cls()
         for k, v in values.items():
@@ -131,10 +115,10 @@ class Sale(metaclass=PoolMeta):
         for linegroup in detail:
             values = {}
             for segment in linegroup:
-                if segment.tag not in list(template['detail'].keys()):
+                if segment.tag not in template['detail'].keys():
                     continue
                 template_segment = template['detail'].get(segment.tag)
-                process = eval('cls._process_{}'.format(segment.tag))
+                process = eval('cls._process_{}LIN'.format(segment.tag))
                 to_update, errors = process(segment, template_segment)
                 if errors:
                     # If there are errors the linegroup isn't processed
@@ -144,37 +128,28 @@ class Sale(metaclass=PoolMeta):
                     values.update(to_update)
             if errors:
                 continue
-            values.update({'sale': sale.id})
             line = SaleLine().set_fields_value(values)
-            line.on_change_product()
-            line.on_change_quantity()
+            # This fields are a required fields, we set its value to a
+            # default valuein order to the sale can be saved. No matter
+            # if it isn't the true value because it will be calculated next
+            # in the on_change_product and on_change_quantity calls.
+            if not hasattr(line, 'description'):
+                line.description = 'temp EDI description'
+            if not hasattr(line, 'unit_price'):
+                line.unit_price = ZERO_
+            else:
+                # If the line has a unit_price it means that isn't necessary
+                # to apply discounts and it must be cleaned.
+                if hasattr(line, 'discount1'):
+                    line.discount1 = ZERO_
+                elif hasattr(line, 'discount'):
+                    line.discount = ZERO_
+
             lines.append(line)
 
-        sale.lines = lines
+        if lines:
+            sale.lines = lines
         return sale, total_errors
-
-    @classmethod
-    def _validate_segment(cls, elements, template_segment_elements):
-        """
-        Validate the segment elements against the template
-        """
-        if len(template_segment_elements) > len(elements):
-            raise MissingFieldsError
-        for index, item in enumerate(template_segment_elements):
-            if item == '!ignore':
-                continue
-            elif item == '!value':
-                if not elements[index]:
-                    raise IncorrectValueForField
-            elif isinstance(item, list):
-                # Recursively checks childs
-                cls._validate_segment(elements[index], item)
-            elif isinstance(item, tuple):
-                if elements[index] not in item:
-                    raise IncorrectValueForField
-            else:
-                if elements[index] != item:
-                    raise IncorrectValueForField
 
     @classmethod
     @with_segment_check
@@ -228,11 +203,11 @@ class Sale(metaclass=PoolMeta):
         return {'currency': currency}, NO_ERRORS
 
     @classmethod
-    def _process_PIA(cls, segment, template):
+    def _process_PIALIN(cls, segment, template):
         pool = Pool()
         Product = pool.get('product.product')
         try:
-            cls._validate_segment(segment.elements, template)
+            validate_segment(segment.elements, template)
         except MissingFieldsError:
             return DO_NOTHING, NO_ERRORS
         except IncorrectValueForField:
@@ -240,8 +215,7 @@ class Sale(metaclass=PoolMeta):
             serialized_segment = serializer.serialize([segment])
             msg = 'Incorrect value for field in segment'
             return DO_NOTHING, ['{}: {}'.format(
-                    msg,
-                    str(serialized_segment))]
+                        msg, str(serialized_segment))]
         else:
             code = segment.elements[1][0]
             product = Product.search([('code', '=', code)], limit=1)
@@ -250,13 +224,12 @@ class Sale(metaclass=PoolMeta):
                 serialized_segment = serializer.serialize([segment])
                 msg = 'No product found in segment'
                 return DO_NOTHING, ['{}: {}'.format(
-                    msg,
-                    str(serialized_segment))]
+                        msg, str(serialized_segment))]
             return {'product': product[0].id}, NO_ERRORS
 
     @classmethod
     @with_segment_check
-    def _process_QTY(cls, segment, template):
+    def _process_QTYLIN(cls, segment, template):
         pool = Pool()
         Uom = pool.get('product.uom')
         uom_value = UOMS_EDI_TO_TRYTON.get(segment.elements[0][-1], 'u')
@@ -266,44 +239,51 @@ class Sale(metaclass=PoolMeta):
 
     @classmethod
     @with_segment_check
-    def _process_DTM(cls, segment, template):
+    def _process_DTMLIN(cls, segment, template):
         date = datetime.strptime(segment.elements[0][2], '%Y%m%d')
         return {'shipping_date': date}, NO_ERRORS
 
     @classmethod
-    def _separate_header(cls, iterator):
-        """
-        Extracts the header from the rest of the message
-        """
-        for segment in iterator:
-            if segment.tag == 'LIN':
-                rewind(iterator)
-                break
-            else:
-                yield segment
+    @with_segment_check
+    def _process_PRILIN(cls, segment, template):
+        pool = Pool()
+        SaleLine = pool.get('sale.line')
+        field = None
+        value = segment.elements[0][2]
+        if segment.elements[0][0] == 'AAA':
+            field = 'unit_price'
+        elif segment.elements[0][0] == 'AAB':
+            # If the model SaleLine doesn't have the field gross_unit_price
+            # means the module sale_discount was not installed.
+            if hasattr(SaleLine, 'gross_unit_price'):
+                field = 'gross_unit_price'
+        if not field:
+            return DO_NOTHING, NO_ERRORS
+        value = Decimal(value).quantize(Decimal(1) / 10 ** price_digits[1])
+        return {field: Decimal(value)}, NO_ERRORS
 
     @classmethod
-    def _separate_detail(cls, iterator):
-        """
-        Extracts the detail from the rest of the message
-        """
-        line = []
-        for segment in iterator:
-            if segment.tag == 'LIN':
-                if line:
-                    yield line
-                line = []
-                line.append(segment)
-            elif segment.tag != 'UNS':
-                if line:
-                    line.append(segment)
-            else:
-                yield line
-                rewind(iterator)
-                break
+    @with_segment_check
+    def _process_PCDLIN(cls, segment, template):
+        pool = Pool()
+        SaleLine = pool.get('sale.line')
+        field = None
+        discount = Decimal(segment.elements[0][2]) / 100
+        # If the model SaleLine doesn't have the field discount1 means
+        # the module sale_3_discounts was not installed.
+        if hasattr(SaleLine, 'discount1'):
+            field = 'discount1'
+        # If the model SaleLine doesn't have the field discount means
+        # the module sale_discount was not installed.
+        elif hasattr(SaleLine, 'discount'):
+            field = 'discount'
+        else:
+            return DO_NOTHING, NO_ERRORS
+
+        return {field: discount}, NO_ERRORS
 
     @classmethod
-    def get_sales_from_edi_files(cls, template=DEFAULT_TEMPLATE):
+    def create_sales_from_edi_files(cls, template=DEFAULT_TEMPLATE):
         """
         Get sales from edi files
         """
@@ -318,22 +298,22 @@ class Sale(metaclass=PoolMeta):
         sales = []
         to_delete = []
         for fname in files:
-            if fname[-4:] != '.txt':
+            if fname[-4:] not in KNOWN_EXTENSIONS:
                 continue
-            with open(fname, 'rb') as fp:
-                edi_file = fp.read()
             try:
                 sale, errors = cls.create_sale_from_edi_file(
-                    str(edi_file, 'utf-8'), template)
+                    fname, template)
             except RuntimeError:
                 continue
             else:
                 if sale:
-                    sale.edi_order_file = edi_file
+                    with open(fname, 'rb') as fp:
+                        sale.edi_order_file = fp.read()
                     sales.append(sale)
                     to_delete.append(fname)
                 if errors:
-                    error_fname = os.path.join(errors_path, 'error_{}.EDI'.format(
+                    error_fname = os.path.join(errors_path,
+                        'error_{}.EDI'.format(
                             os.path.splitext(os.path.basename(fname))[0]
                             ))
                     with open(error_fname, 'w') as fp:
@@ -342,6 +322,25 @@ class Sale(metaclass=PoolMeta):
         if to_delete:
             for file in to_delete:
                 os.remove(file)
+        return results
+
+    @classmethod
+    def apply_on_change_product_and_quantity_to_lines(cls, sales):
+        pool = Pool()
+        SaleLine = pool.get('sale.line')
+        to_write = []
+        for sale in sales:
+            for line in sale.lines:
+                line.apply_on_change_product_and_quantity()
+                to_write.extend(([line], line._save_values))
+        if to_write:
+            SaleLine.write(*to_write)
+
+    @classmethod
+    def get_sales_from_edi_files(cls):
+        '''Get orders from edi files'''
+        results = cls.create_sales_from_edi_files()
+        cls.apply_on_change_product_and_quantity_to_lines(results)
         return results
 
     @classmethod
@@ -364,3 +363,7 @@ class SaleLine(metaclass=PoolMeta):
         for k, v in values.items():
             setattr(self, k, v)
         return self
+
+    def apply_on_change_product_and_quantity(self):
+        self.on_change_product()
+        self.on_change_quantity()

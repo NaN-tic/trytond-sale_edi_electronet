@@ -3,12 +3,6 @@
      copyright notices and license terms. -->
 <tryton>
     <data>
-        <!-- sale.sale -->
-        <record model="ir.ui.view" id="sale_view_form">
-            <field name="model">sale.sale</field>
-            <field name="inherit" ref="sale.sale_view_form"/>
-            <field name="name">sale_form</field>
-        </record>
         <!-- create EDI orders cron -->
         <record model="res.user" id="user_create_edi_orders">
             <field name="login">user_cron_create_edi_orders</field>

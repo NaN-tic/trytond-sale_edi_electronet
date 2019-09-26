@@ -3,7 +3,8 @@
 # copyright notices and license terms.
 from trytond.pool import Pool, PoolMeta
 from trytond.modules.product import price_digits
-from edifact.errors import (IncorrectValueForField, MissingFieldsError)
+from trytond.modules.edocument_unedifact.edocument import (
+    IncorrectValueForField, MissingFieldsError)
 from trytond.modules.edocument_unedifact.edocument import (EdifactMixin,
     UOMS_EDI_TO_TRYTON, EdiTemplate)
 from trytond.modules.edocument_unedifact.edocument import (Message, Serializer)

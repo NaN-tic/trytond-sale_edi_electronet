@@ -3,7 +3,8 @@
 # copyright notices and license terms.
 from trytond.pool import Pool, PoolMeta
 from trytond.modules.product import price_digits
-from edifact.errors import (IncorrectValueForField, MissingFieldsError)
+from trytond.modules.edocument_unedifact.edocument import (
+    IncorrectValueForField, MissingFieldsError)
 from trytond.modules.edocument_unedifact.edocument import (EdifactMixin,
     UOMS_EDI_TO_TRYTON, EdiTemplate)
 from trytond.modules.edocument_unedifact.edocument import (Message, Serializer)
@@ -24,6 +25,7 @@ KNOWN_EXTENSIONS = ['.txt', '.edi', '.pla']
 MODULE_PATH = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_TEMPLATE = 'ORDERS.yml'
 
+
 class Cron(metaclass=PoolMeta):
     __name__ = 'ir.cron'
 
@@ -32,6 +34,7 @@ class Cron(metaclass=PoolMeta):
         super(Cron, cls).__setup__()
         cls.method.selection.extend([
             ('sale.sale|get_sales_from_edi_files_cron', 'Create EDI Orders')])
+
 
 class Sale(EdifactMixin, metaclass=PoolMeta):
     __name__ = 'sale.sale'

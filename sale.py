@@ -2,15 +2,14 @@
 # The COPYRIGHT file at the top level of this repository contains the full
 # copyright notices and license terms.
 from trytond.pool import Pool, PoolMeta
-from trytond.model import fields
 from trytond.modules.product import price_digits
-from edifact.message import Message
-from edifact.serializer import Serializer
-from edifact.utils import (RewindIterator, with_segment_check,
-    separate_section, validate_segment, DO_NOTHING, NO_ERRORS)
 from edifact.errors import (IncorrectValueForField, MissingFieldsError)
-import oyaml as yaml
-from io import open
+from trytond.modules.edocument_unedifact.edocument import (EdifactMixin,
+    UOMS_EDI_TO_TRYTON, EdiTemplate)
+from trytond.modules.edocument_unedifact.edocument import (Message, Serializer)
+from trytond.modules.edocument_unedifact.edocument import (with_segment_check,
+    separate_section, RewindIterator, DO_NOTHING, NO_ERRORS,
+    validate_segment)
 import os
 from datetime import datetime
 from itertools import chain
@@ -21,39 +20,41 @@ __all__ = ['Sale', 'SaleLine']
 
 ZERO_ = Decimal('0')
 NO_SALE = None
-KNOWN_EXTENSIONS = ['.txt', '.edi', '.pla']
 MODULE_PATH = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_TEMPLATE = 'templates/ORDERS.yml'
-UOMS_EDI_TO_TRYTON = {
-    'KGM': 'kg',
-    'LTR': 'l',
-    'MTR': 'm',
-    'UN': 'u',
-}
+DEFAULT_TEMPLATE = 'ORDERS.yml'
 
 
-class Sale:
+class Sale(EdifactMixin):
     __name__ = 'sale.sale'
     __metaclass__ = PoolMeta
 
-    edi_order_file = fields.Binary('EDI Order File', states={
-            'readonly': True,
-            })
+    def set_fields_value(self, values):
+        """
+        Set Sale fields values from a given dict
+        """
+        for field in self._fields.keys():
+            value = values.get(field)
+            if not value:
+                default = self._defaults.get(field)
+                if default:
+                    value = default()
+            setattr(self, field, value)
+        return self
 
     @classmethod
-    def create_sale_from_edi_file(cls, edi_file, template_name):
+    def import_edi_input(cls, response, template):
         """
         Creates a sale record from a given edi file
         :param edi_file: EDI file to be processed.
         :template_name: File name from the file used to validate the EDI msg.
         """
+
         pool = Pool()
         SaleLine = pool.get('sale.line')
-
-        template_path = os.path.join(MODULE_PATH, template_name)
-        with open(template_path, encoding='utf-8') as fp:
-            template = yaml.load(fp.read())
-        message = Message.from_file(edi_file, encoding='utf-8')
+        control_chars = cls.set_control_chars(
+            template.get('control_chars', {}))
+        message = Message.from_str(response.upper().replace('\r', ''),
+            characters=control_chars)
         # If there isn't a segment UNH with ORDERS:D:96A:UN:EAN008
         # means the file readed it's not a EDI order.
         unh = message.get_segment('UNH')
@@ -63,7 +64,7 @@ class Sale:
 
         segments_iterator = RewindIterator(message.segments)
         header = [x for x in chain(*separate_section(segments_iterator,
-                    end='LIN'))]
+                    start='BGM', end='LIN'))]
         detail = [x for x in separate_section(segments_iterator, start='LIN',
                 end='UNS')]
         del(segments_iterator)
@@ -71,6 +72,7 @@ class Sale:
         total_errors = []
         discard_if_partial_sale = False
         values = {}
+        nad_segments = []
         for segment in header:
             # Ignore the tags we not use
             if segment.tag not in template['header'].keys():
@@ -85,6 +87,9 @@ class Sale:
                 if errors:
                     total_errors += errors
                 continue
+            if segment.tag == u'NAD':
+                nad_segments.append(segment)
+                continue
 
             process = eval('cls._process_{}'.format(segment.tag))
             to_update, errors = process(segment, template_segment)
@@ -94,15 +99,38 @@ class Sale:
             if to_update:
                 values.update(to_update)
 
+        if not nad_segments:
+            return NO_SALE, total_errors
+
+        nad_results = {}
+        template_segment = template['header'].get(u'NAD')
+        for segment in nad_segments:
+            result, errors = cls._process_NAD(segment, template_segment)
+            if errors:
+                total_errors += errors
+            if result:
+                nad_results.update(result)
+
+        if nad_results:
+            ms_parties = nad_results.get('MS', [])
+            dp_address = nad_results.get('DP')
+            address_party = dp_address.party if dp_address else None
+            if address_party in ms_parties:
+                values.update({
+                    'shipment_party': address_party,
+                    'shipment_address': dp_address,
+                    })
+
         # If any header segment could be processed or there isn't a party
         # the sale isn't created
         if not values or not values.get('shipment_party'):
             return NO_SALE, total_errors
 
         sale = cls()
-        for k, v in values.iteritems():
-            setattr(sale, k, v)
+        sale.set_fields_value(values)
         sale.on_change_shipment_party()
+        if not sale.party:
+            sale.party = sale.shipment_party
         sale.on_change_party()
         lines = []
         for linegroup in detail:
@@ -126,22 +154,23 @@ class Sale:
             # default valuein order to the sale can be saved. No matter
             # if it isn't the true value because it will be calculated next
             # in the on_change_product and on_change_quantity calls.
-            if not hasattr(line, 'description'):
-                line.description = u'temp EDI description'
-            if not hasattr(line, 'unit_price'):
+            if not getattr(line, 'description'):
+                line.description = line.product.rec_name()
+            if not getattr(line, 'unit_price'):
                 line.unit_price = ZERO_
             else:
                 # If the line has a unit_price it means that isn't necessary
                 # to apply discounts and it must be cleaned.
-                if hasattr(line, 'discount1'):
-                    line.discount1 = ZERO_
-                elif hasattr(line, 'discount'):
-                    line.discount = ZERO_
-
+                for field in ('discount', 'discount1', 'discount2',
+                        'discount3'):
+                    if hasattr(line, field):
+                        setattr(line, field, ZERO_)
+            if hasattr(line, 'gross_unit_price') and not line.gross_unit_price:
+                line.gross_unit_price = ZERO_
             lines.append(line)
-
         if lines:
             sale.lines = lines
+        sale.save()
         return sale, total_errors
 
     @classmethod
@@ -165,18 +194,27 @@ class Sale:
         serializer = Serializer()
         pool = Pool()
         PartyIdentifier = pool.get('party.identifier')
-        if segment.elements[0] in ('MS',):
+        Address = pool.get('party.address')
+        if segment.elements[0] == u'MS':
             edi_operational_point = segment.elements[1][0]
-            identifier = PartyIdentifier.search([
+            identifiers = PartyIdentifier.search([
                     ('type', '=', 'edi'),
-                    ('code', '=', edi_operational_point)],
-                limit=1)
-            if not identifier:
+                    ('code', '=', edi_operational_point)])
+            if not identifiers:
                 serialized_segment = serializer.serialize([segment])
                 msg = u'Party not found'
                 return DO_NOTHING, ['{}: {}'.format(msg, serialized_segment)]
-            party = identifier[0].party
-            return {'shipment_party': party, 'party': party}, NO_ERRORS
+            return {'MS': [x.party for x in identifiers]}, NO_ERRORS
+        elif segment.elements[0] == u'DP':
+            edi_operational_point = segment.elements[1][0]
+            address, = Address.search([
+                    ('edi_ean', '=', edi_operational_point)],
+                limit=1) or [None]
+            if not address:
+                serialized_segment = serializer.serialize([segment])
+                msg = u'Addresses not found'
+                return [], ['{}: {}'.format(msg, serialized_segment)]
+            return {'DP': address}, NO_ERRORS
 
         return DO_NOTHING, NO_ERRORS
 
@@ -276,7 +314,7 @@ class Sale:
         return {field: discount}, NO_ERRORS
 
     @classmethod
-    def create_sales_from_edi_files(cls, template=DEFAULT_TEMPLATE):
+    def create_edi_sales(cls, template=DEFAULT_TEMPLATE):
         """
         Get sales from edi files
         """
@@ -285,37 +323,12 @@ class Sale:
         configuration = Configuration(1)
         errors_path = os.path.abspath(configuration.edi_errors_path)
         source_path = os.path.abspath(configuration.edi_source_path)
-        files = [os.path.join(source_path, file) for file in
-                 os.listdir(source_path) if os.path.isfile(os.path.join(
-                     source_path, file))]
-        sales = []
-        to_delete = []
-        for fname in files:
-            if fname[-4:] not in KNOWN_EXTENSIONS:
-                continue
-            try:
-                sale, errors = cls.create_sale_from_edi_file(
-                    fname, template)
-            except RuntimeError:
-                continue
-            else:
-                if sale:
-                    with open(fname, 'rb') as fp:
-                        sale.edi_order_file = fp.read()
-                    sales.append(sale)
-                    to_delete.append(fname)
-                if errors:
-                    error_fname = os.path.join(errors_path,
-                        'error_{}.EDI'.format(
-                            os.path.splitext(os.path.basename(fname))[0]
-                            ))
-                    with open(error_fname, 'w') as fp:
-                        fp.write('\n'.join(errors))
-        results = cls.create([s._save_values for s in sales]) if sales else []
-        if to_delete:
-            for file in to_delete:
-                os.remove(file)
-        return results
+        template_name = (configuration.template_sale_edi
+            or DEFAULT_TEMPLATE)
+        template_path = os.path.join(os.path.join(MODULE_PATH, 'templates'),
+            template_name)
+        template = EdiTemplate(template_name, template_path)
+        return cls.process_edi_inputs(source_path, errors_path, template)
 
     @classmethod
     def apply_on_change_product_and_quantity_to_lines(cls, sales):
@@ -325,14 +338,14 @@ class Sale:
         for sale in sales:
             for line in sale.lines:
                 line.apply_on_change_product_and_quantity()
-                to_write.extend(([line], line._save_values))
+            to_write.extend(sale.lines)
         if to_write:
-            SaleLine.write(*to_write)
+            SaleLine.save(to_write)
 
     @classmethod
     def get_sales_from_edi_files(cls):
         '''Get orders from edi files'''
-        results = cls.create_sales_from_edi_files()
+        results = cls.create_edi_sales()
         cls.apply_on_change_product_and_quantity_to_lines(results)
         return results
 
@@ -354,8 +367,13 @@ class SaleLine:
         """
         Set SaleLine fields values from a given dict
         """
-        for k, v in values.iteritems():
-            setattr(self, k, v)
+        for field in self._fields.keys():
+            value = values.get(field)
+            if not value:
+                default = self._defaults.get(field)
+                if default:
+                    value = default()
+            setattr(self, field, value)
         return self
 
     def apply_on_change_product_and_quantity(self):

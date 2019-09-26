@@ -14,6 +14,7 @@ class SaleConfiguration:
 
     edi_source_path = fields.Char('Source Path')
     edi_errors_path = fields.Char('Errors Path')
+    template_sale_edi = fields.Char('Template EDI Used for Sale')
 
     @staticmethod
     def default_edi_source_path():

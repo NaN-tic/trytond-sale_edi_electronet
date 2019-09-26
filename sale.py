@@ -163,7 +163,7 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
             # if it isn't the true value because it will be calculated next
             # in the on_change_product and on_change_quantity calls.
             if not getattr(line, 'description'):
-                line.description = line.product.rec_name()
+                line.description = line.product.rec_name
             if not getattr(line, 'unit_price'):
                 line.unit_price = ZERO_
             else:

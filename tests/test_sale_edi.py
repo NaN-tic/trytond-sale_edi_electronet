@@ -166,6 +166,7 @@ class TestCase(ModuleTestCase):
         Party = pool.get('party.party')
         ProductUom = pool.get('product.uom')
         ProductTemplate = pool.get('product.template')
+        PartyIdentifier = pool.get('party.identifier')
         Product = pool.get('product.product')
         ProductCategory = pool.get('product.category')
         Tax = pool.get('account.tax')
@@ -200,9 +201,16 @@ class TestCase(ModuleTestCase):
             customer, = Party.search([
                     ('name', '=', 'customer1'),
                     ], limit=1)
-            customer.edi_operational_point = 'PUNTO_VENTA'
             customer.customer_payment_term = term
             customer.save()
+            identifier = PartyIdentifier()
+            identifier.type = 'edi'
+            identifier.code = 'PUNTO_VENTA'
+            identifier.party = customer
+            identifier.save()
+            address, = customer.addresses
+            address.edi_ean = 'PUNTO_VENTA'
+            address.save()
             sale_cfg = SaleConfig(1)
             sale_cfg.edi_source_path = os.path.abspath(TEST_FILES_DIR)
             sale_cfg.save()

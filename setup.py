@@ -70,6 +70,12 @@ dependency_links = [
             'branch': branch,
             'series': series,
             }),
+    ('hg+https://bitbucket.org/nantic/'
+        'python-edifact@%(branch)s'
+        '#egg=edifact-%(series)s' % {
+            'branch': branch,
+            'series': series,
+            }),
     ]
 if minor_version % 2:
     # Add development index for testing with proteus

@@ -171,7 +171,6 @@ class Sale(EdifactMixin):
             lines.append(line)
         if lines:
             sale.lines = lines
-        sale.save()
         return sale, total_errors
 
     @classmethod

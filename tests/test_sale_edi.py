@@ -223,12 +223,9 @@ class TestCase(ModuleTestCase):
             template.default_uom = unit
             template.type = 'goods'
             template.account_category = category
-            template.purchasable = True
             template.salable = True
             template.list_price = Decimal('10')
             template.cost_price_method = 'fixed'
-            template.account_expense = expense
-            template.account_revenue = revenue
             template.sale_uom = unit
             template.save()
             product = Product()

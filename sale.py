@@ -199,7 +199,7 @@ class Sale(EdifactMixin):
             edi_operational_point = segment.elements[1][0]
             identifiers = PartyIdentifier.search([
                     ('type', '=', 'edi'),
-                    ('code', '=', edi_operational_point)])
+                    ('code', 'ilike', edi_operational_point)])
             if not identifiers:
                 serialized_segment = serializer.serialize([segment])
                 msg = u'Party not found'
@@ -208,7 +208,7 @@ class Sale(EdifactMixin):
         elif segment.elements[0] == u'DP':
             edi_operational_point = segment.elements[1][0]
             address, = Address.search([
-                    ('edi_ean', '=', edi_operational_point)],
+                    ('edi_ean', 'ilike', edi_operational_point)],
                 limit=1) or [None]
             if not address:
                 serialized_segment = serializer.serialize([segment])

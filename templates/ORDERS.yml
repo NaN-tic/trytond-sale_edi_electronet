@@ -1,10 +1,10 @@
 header:
     BGM: ['220', '!value', '9']
-    ALI: ['', '', !!python/tuple ['83E', 'X1', 'X2']] 
-    FTX: ['ZZZ', '', '', '!value'] 
+    ALI: ['', '', !!python/tuple ['83E', 'X1', 'X2']]
+    FTX: ['ZZZ', '', '', '!value']
     #RFF: [['ON', '!ignore', '!value']]
     NAD: [!!python/tuple ['BY', 'SU', 'DP', 'MS'], ['!value']]
-    CUX: [['2', '', '!value', '', '!ignore']] 
+    CUX: [['2', '', '!value', '', '!ignore']]
 detail:
     #LIN: ['!ignore', '', ['!value', '', 'EN']]
     PIA: [!!python/tuple ['1','5'], ['!value', '', 'SA']]

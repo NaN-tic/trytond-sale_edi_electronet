@@ -69,6 +69,7 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
         # If there isn't a segment UNH with ORDERS:D:96A:UN:EAN008
         # means the file readed it's not a EDI order.
         unh = message.get_segment('UNH')
+
         if (not unh or u"ORDERS:D:96A:UN:EAN008"
                 not in Serializer().serialize([unh])):
             return NO_SALE, NO_ERRORS
@@ -124,9 +125,11 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
 
         if nad_results:
             ms_parties = nad_results.get('MS', [])
+            by_parties = nad_results.get('BY', [])
             dp_address = nad_results.get('DP')
+            sale_parties = list(set(ms_parties + by_parties))
             address_party = dp_address.party if dp_address else None
-            if address_party in ms_parties:
+            if address_party in sale_parties:
                 values.update({
                     'shipment_party': address_party,
                     'shipment_address': dp_address,
@@ -181,7 +184,6 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
             lines.append(line)
         if lines:
             sale.lines = lines
-        sale.save()
         return sale, total_errors
 
     @classmethod
@@ -206,7 +208,7 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
         pool = Pool()
         PartyIdentifier = pool.get('party.identifier')
         Address = pool.get('party.address')
-        if segment.elements[0] == 'MS':
+        if segment.elements[0] in ('MS', 'BY'):
             edi_operational_point = segment.elements[1][0]
             identifiers = PartyIdentifier.search([
                     ('type', '=', 'edi'),
@@ -357,7 +359,8 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
     def get_sales_from_edi_files(cls):
         '''Get orders from edi files'''
         results = cls.create_edi_sales()
-        cls.apply_on_change_product_and_quantity_to_lines(results)
+        if results:
+            cls.apply_on_change_product_and_quantity_to_lines(results)
         return results
 
     @classmethod

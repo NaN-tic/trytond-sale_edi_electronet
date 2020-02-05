@@ -158,19 +158,30 @@ class Sale(EdifactMixin):
             # default valuein order to the sale can be saved. No matter
             # if it isn't the true value because it will be calculated next
             # in the on_change_product and on_change_quantity calls.
-            if not getattr(line, 'description'):
+            if not getattr(line, 'description', None):
                 line.description = line.product.rec_name
-            if not getattr(line, 'unit_price'):
+            if not getattr(line, 'unit_price', None):
                 line.unit_price = ZERO_
             else:
-                # If the line has a unit_price it means that isn't necessary
-                # to apply discounts and it must be cleaned.
-                for field in ('discount', 'discount1', 'discount2',
-                        'discount3'):
-                    if hasattr(line, field):
-                        setattr(line, field, ZERO_)
-            if hasattr(line, 'gross_unit_price') and not line.gross_unit_price:
-                line.gross_unit_price = ZERO_
+                if (hasattr(line, 'gross_unit_price')
+                        and not line.gross_unit_price
+                        and line.unit_price):
+                    gross_unit_price = line.unit_price
+                    discount1 = getattr(line, 'discount1', ZERO_)
+                    discount2 = getattr(line, 'discount2', ZERO_)
+                    discount3 = getattr(line, 'discount3', ZERO_)
+                    if discount1 or discount2 or discount3:
+                        line.discount = (Decimal(1 - (
+                            (1 - discount1) * (1 - discount2) * (1 -
+                                        discount3))))
+                    if line.discount:
+                        if line.discount != 1:
+                            gross_unit_price = gross_unit_price / (1 -
+                                line.discount)
+                        else:
+                            gross_unit_price = ZERO_
+                    line.gross_unit_price = gross_unit_price
+
             lines.append(line)
         if lines:
             sale.lines = lines

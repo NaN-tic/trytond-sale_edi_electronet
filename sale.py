@@ -180,7 +180,8 @@ class Sale(EdifactMixin):
                                 line.discount)
                         else:
                             gross_unit_price = ZERO_
-                    line.gross_unit_price = gross_unit_price
+                    line.gross_unit_price = Decimal(gross_unit_price).quantize(
+                        Decimal(1) / 10 ** price_digits[1])
 
             lines.append(line)
         if lines:

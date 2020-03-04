@@ -162,6 +162,7 @@ class Sale(EdifactMixin):
                 line.description = line.product.rec_name
             if not getattr(line, 'unit_price', None):
                 line.unit_price = ZERO_
+                line.gross_unit_price = ZERO_
             else:
                 if (hasattr(line, 'gross_unit_price')
                         and not line.gross_unit_price

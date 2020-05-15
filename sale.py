@@ -99,6 +99,10 @@ class Sale(EdifactMixin):
                 total_errors += errors
                 continue
             if to_update:
+                if isinstance(to_update, dict):
+                    for k, v in to_update.items():
+                        if k in values.keys():
+                            to_update = {k: "%s\n%s" % (values[k], v)}
                 values.update(to_update)
 
         if not nad_segments:
@@ -202,7 +206,41 @@ class Sale(EdifactMixin):
     @classmethod
     @with_segment_check
     def _process_FTX(cls, segment, template):
-        return {'comment': segment.elements[3]}, NO_ERRORS
+        if segment and segment.elements:
+            element = segment.elements[3]
+            if isinstance(element, list):
+                element = "".join(element)
+            return {'comment': element}, NO_ERRORS
+        else:
+            return DO_NOTHING, NO_ERRORS
+
+    @classmethod
+    @with_segment_check
+    def _process_CTA(cls, segment, template):
+        if segment and segment.elements:
+            element = segment.elements[1]
+            if isinstance(element, list):
+                element = "".join(element)
+            return {'comment': element}, NO_ERRORS
+        else:
+            return DO_NOTHING, NO_ERRORS
+
+    @classmethod
+    @with_segment_check
+    def _process_COM(cls, segment, template):
+        if segment and segment.elements:
+            element = segment.elements[0][0]
+            if isinstance(element, list):
+                element = "".join(element)
+            if segment.elements[0][2] == 'TE':
+                element = "Telf: %s" % element
+            elif segment.elements[0][2] == 'FX':
+                element = "Fax: %s" % element
+            elif segment.elements[0][2] == 'EM':
+                element = "Email: %s" % element
+            return {'comment': element}, NO_ERRORS
+        else:
+            return DO_NOTHING, NO_ERRORS
 
     @classmethod
     @with_segment_check
@@ -224,8 +262,8 @@ class Sale(EdifactMixin):
         elif segment.elements[0] == u'DP':
             edi_operational_point = segment.elements[1][0]
             address, = Address.search([
-                    ('edi_ean', 'ilike', edi_operational_point)],
-                limit=1) or [None]
+                    ('electronet_sale_point', 'ilike', edi_operational_point)
+                    ], limit=1) or [None]
             if not address:
                 serialized_segment = serializer.serialize([segment])
                 msg = u'Addresses not found'
@@ -297,6 +335,8 @@ class Sale(EdifactMixin):
         SaleLine = pool.get('sale.line')
         field = None
         value = segment.elements[0][2]
+        qty_value = segment.elements[0][6]
+        value = float(value)/float(qty_value)
         if segment.elements[0][0] == 'AAA':
             field = 'unit_price'
         elif segment.elements[0][0] == 'AAB':
@@ -307,7 +347,7 @@ class Sale(EdifactMixin):
         if not field:
             return DO_NOTHING, NO_ERRORS
         value = Decimal(value).quantize(Decimal(1) / 10 ** price_digits[1])
-        return {field: Decimal(value)}, NO_ERRORS
+        return {field: value}, NO_ERRORS
 
     @classmethod
     @with_segment_check

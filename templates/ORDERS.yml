@@ -2,6 +2,8 @@ header:
     BGM: ['220', '!value', '9']
     ALI: ['', '', !!python/tuple ['83E', 'X1', 'X2']]
     FTX: ['ZZZ', '', '', '!value']
+    CTA: ['IC', '!value']
+    COM: [['!value', '', '!value']]
     #RFF: [['ON', '!ignore', '!value']]
     NAD: [!!python/tuple ['BY', 'SU', 'DP', 'MS'], ['!value']]
     CUX: [['2', '', '!value', '', '!ignore']]

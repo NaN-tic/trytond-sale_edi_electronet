@@ -164,6 +164,11 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
                     total_errors += errors
                     break
                 if to_update:
+                    if (len(segment.elements) > 0 and
+                            len(segment.elements[0]) > 0 and
+                            segment.elements[0][0] == 'INF' and
+                            values.get('unit_price', 0) != 0):
+                        continue
                     values.update(to_update)
             if errors:
                 continue
@@ -334,7 +339,7 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
         value = segment.elements[0][2]
         qty_value = segment.elements[0][6]
         value = float(value)/float(qty_value)
-        if segment.elements[0][0] == 'AAA':
+        if segment.elements[0][0] in ('AAA', 'INF'):
             field = 'unit_price'
         elif segment.elements[0][0] == 'AAB':
             # If the model SaleLine doesn't have the field gross_unit_price

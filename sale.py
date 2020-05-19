@@ -156,8 +156,11 @@ class Sale(EdifactMixin):
                 if to_update:
                     if (len(segment.elements) > 0 and
                             len(segment.elements[0]) > 0 and
-                            segment.elements[0][0] == 'INF' and
-                            values.get('unit_price', 0) != 0):
+                            ((segment.elements[0][0] == 'INF' and
+                                    values.get('unit_price', 0) != 0) or
+                                (segment.elements[0][0] == 'AAA' and
+                                    to_update['unit_price'] == 0 and
+                                    values.get('unit_price')))):
                         continue
                     values.update(to_update)
             if errors:

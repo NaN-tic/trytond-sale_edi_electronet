@@ -164,18 +164,11 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
                     total_errors += errors
                     break
                 if to_update:
-                    if (len(segment.elements) > 0 and
-                            len(segment.elements[0]) > 0 and
-                            ((segment.elements[0][0] == 'INF' and
-                                    values.get('unit_price', 0) != 0) or
-                                (segment.elements[0][0] == 'AAA' and
-                                    to_update['unit_price'] == 0 and
-                                    values.get('unit_price')))):
-                        continue
                     values.update(to_update)
             if errors:
                 continue
             line = SaleLine().set_fields_value(values)
+            line.update_prices()
             # This fields are a required fields, we set its value to a
             # default valuein order to the sale can be saved. No matter
             # if it isn't the true value because it will be calculated next
@@ -342,13 +335,15 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
         value = segment.elements[0][2]
         qty_value = segment.elements[0][6]
         value = float(value)/float(qty_value)
-        if segment.elements[0][0] in ('AAA', 'INF'):
+        if segment.elements[0][0] ==  'AAA':
             field = 'unit_price'
-        elif segment.elements[0][0] == 'AAB':
+        elif segment.elements[0][0] in ('AAB', 'INF'):
             # If the model SaleLine doesn't have the field gross_unit_price
             # means the module sale_discount was not installed.
             if hasattr(SaleLine, 'gross_unit_price'):
                 field = 'gross_unit_price'
+            else:
+                field = 'unit_price'
         if not field:
             return DO_NOTHING, NO_ERRORS
         value = Decimal(value).quantize(Decimal(1) / 10 ** price_digits[1])

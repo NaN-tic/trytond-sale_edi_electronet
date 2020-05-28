@@ -157,8 +157,14 @@ class Sale(EdifactMixin):
                     values.update(to_update)
             if errors:
                 continue
+            if (values.get('gross_unit_price', None) == 0 and
+                    values.get('unit_price', None) != 0):
+                del values['gross_unit_price']
             line = SaleLine().set_fields_value(values)
-            line.update_prices()
+            if values.get('gross_unit_price', None):
+                line.update_prices()
+            else:
+                line.gross_unit_price = line.unit_price
             # This fields are a required fields, we set its value to a
             # default valuein order to the sale can be saved. No matter
             # if it isn't the true value because it will be calculated next
@@ -168,27 +174,6 @@ class Sale(EdifactMixin):
             if not getattr(line, 'unit_price', None):
                 line.unit_price = ZERO_
                 line.gross_unit_price = ZERO_
-            else:
-                if (hasattr(line, 'gross_unit_price')
-                        and not line.gross_unit_price
-                        and line.unit_price):
-                    gross_unit_price = line.unit_price
-                    discount1 = getattr(line, 'discount1', ZERO_)
-                    discount2 = getattr(line, 'discount2', ZERO_)
-                    discount3 = getattr(line, 'discount3', ZERO_)
-                    if discount1 or discount2 or discount3:
-                        line.discount = (Decimal(1 - (
-                            (1 - discount1) * (1 - discount2) * (1 -
-                                        discount3))))
-                    if line.discount:
-                        if line.discount != 1:
-                            gross_unit_price = gross_unit_price / (1 -
-                                line.discount)
-                        else:
-                            gross_unit_price = ZERO_
-                    line.gross_unit_price = Decimal(gross_unit_price).quantize(
-                        Decimal(1) / 10 ** price_digits[1])
-
             lines.append(line)
         if lines:
             sale.lines = lines

@@ -167,8 +167,14 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
                     values.update(to_update)
             if errors:
                 continue
+            if (values.get('gross_unit_price', None) == 0 and
+                    values.get('unit_price', None) != 0):
+                del values['gross_unit_price']
             line = SaleLine().set_fields_value(values)
-            line.update_prices()
+            if values.get('gross_unit_price', None):
+                line.update_prices()
+            else:
+                line.gross_unit_price = line.unit_price
             # This fields are a required fields, we set its value to a
             # default valuein order to the sale can be saved. No matter
             # if it isn't the true value because it will be calculated next
@@ -177,14 +183,6 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
                 line.description = line.product.rec_name
             if not getattr(line, 'unit_price'):
                 line.unit_price = ZERO_
-            else:
-                # If the line has a unit_price it means that isn't necessary
-                # to apply discounts and it must be cleaned.
-                for field in ('discount', 'discount1', 'discount2',
-                        'discount3'):
-                    if hasattr(line, field):
-                        setattr(line, field, ZERO_)
-            if hasattr(line, 'gross_unit_price') and not line.gross_unit_price:
                 line.gross_unit_price = ZERO_
             lines.append(line)
         if lines:

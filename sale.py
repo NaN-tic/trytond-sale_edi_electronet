@@ -3,14 +3,17 @@
 # copyright notices and license terms.
 from trytond.pool import Pool, PoolMeta
 from trytond.modules.product import price_digits
-from trytond.modules.edocument_unedifact.edocument import (
+from edifact.errors import (
     IncorrectValueForField, MissingFieldsError)
+from edifact.message import Message
+from edifact.serializer import Serializer
 from trytond.modules.edocument_unedifact.edocument import (EdifactMixin,
     UOMS_EDI_TO_TRYTON, EdiTemplate)
-from trytond.modules.edocument_unedifact.edocument import (Message, Serializer)
-from trytond.modules.edocument_unedifact.edocument import (with_segment_check,
-    separate_section, RewindIterator, DO_NOTHING, NO_ERRORS,
-    validate_segment)
+
+from edifact.utils import (with_segment_check, validate_segment,
+    separate_section, RewindIterator, DO_NOTHING, NO_ERRORS)
+from edifact.errors import (IncorrectValueForField, MissingFieldsError)
+
 import os
 from datetime import datetime
 from itertools import chain

@@ -12,7 +12,6 @@ from trytond.modules.edocument_unedifact.edocument import (EdifactMixin,
 
 from edifact.utils import (with_segment_check, validate_segment,
     separate_section, RewindIterator, DO_NOTHING, NO_ERRORS)
-from edifact.errors import (IncorrectValueForField, MissingFieldsError)
 
 import os
 from datetime import datetime

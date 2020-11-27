@@ -188,7 +188,6 @@ class TestCase(ModuleTestCase):
                 company)
             accounts = self.get_accounts(company)
             expense = accounts.get('expense')
-            revenue = accounts.get('revenue')
             rate = Decimal('.10')
             tax = Tax()
             tax.name = 'Tax %s' % rate

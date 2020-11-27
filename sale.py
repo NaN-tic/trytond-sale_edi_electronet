@@ -249,9 +249,14 @@ class Sale(EdifactMixin):
             return {'MS': [x.party for x in identifiers]}, NO_ERRORS
         elif segment.elements[0] == u'DP':
             edi_operational_point = segment.elements[1][0]
+            if hasattr(Address, 'electronet_sale_point'):
+                field = 'electronet_sale_point'
+            else:
+                field = 'edi_ean'
             address, = Address.search([
-                    ('electronet_sale_point', 'ilike', edi_operational_point)
+                    (field, 'ilike', edi_operational_point)
                     ], limit=1) or [None]
+
             if not address:
                 serialized_segment = serializer.serialize([segment])
                 msg = u'Addresses not found'

@@ -306,7 +306,6 @@ class TestCase(ModuleTestCase):
             self.create_moves(company)
             accounts = self.get_accounts(company)
             expense = accounts.get('expense')
-            revenue = accounts.get('revenue')
             rate = Decimal('.10')
             tax = Tax()
             tax.name = 'Tax %s' % rate

@@ -1,7 +1,7 @@
 header:
     BGM: ['220', '!value', '9']
     ALI: ['', '', !!python/tuple ['83E', 'X1', 'X2']]
-    FTX: ['ZZZ', '', '', '!value']
+    FTX: [!!python/tuple ['ZZZ', 'TDT'], '', '', '!value']
     CTA: ['IC', '!value']
     COM: [['!value', '', '!value']]
     #RFF: [['ON', '!ignore', '!value']]

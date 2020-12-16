@@ -8,6 +8,7 @@ from trytond.tests.test_tryton import ModuleTestCase, with_transaction
 from trytond.pool import Pool
 from trytond.transaction import Transaction
 from trytond.modules.company.tests import create_company, set_company
+from trytond.modules.currency.tests import create_currency, add_currency_rate
 from trytond.modules.account.tests import create_chart, get_fiscalyear
 from trytond.modules.account_invoice.tests import set_invoice_sequences
 from decimal import Decimal
@@ -180,6 +181,8 @@ class TestCase(ModuleTestCase):
         shutil.copy(test_fname, TEST_FILES_DIR)
 
         company = create_company()
+        currency = create_currency('EUR')
+        add_currency_rate(currency, 1)
         with set_company(company):
             self.create_fiscalyear_and_chart(company, None,
                 True)
@@ -213,34 +216,44 @@ class TestCase(ModuleTestCase):
             sale_cfg = SaleConfig(1)
             sale_cfg.edi_source_path = os.path.abspath(TEST_FILES_DIR)
             sale_cfg.save()
+
             unit, = ProductUom.search([('name', '=', 'Unit')], limit=1)
             category = ProductCategory(name='test account used',
                 account_expense=expense, accounting=True)
             category.save()
-            template = ProductTemplate()
-            template.name = 'product'
-            template.default_uom = unit
-            template.type = 'goods'
-            template.account_category = category
-            template.salable = True
-            template.list_price = Decimal('10')
-            template.cost_price_method = 'fixed'
-            template.sale_uom = unit
-            template.save()
-            product = Product()
-            product.template = template
-            product.cost_price = Decimal('5')
-            product.code = '67310'
-            product.save()
+
+            for code in ('67310', 'REF1', 'REF3'):
+                product = Product()
+                template = ProductTemplate()
+                template.name = code
+                template.default_uom = unit
+                template.type = 'goods'
+                template.salable = True
+                template.list_price = Decimal('10')
+                template.cost_price_method = 'fixed'
+                template.account_category = category
+                template.sale_uom = unit
+                template.save()
+                product.template = template
+                product.cost_price = Decimal('5')
+                product.code = code
+                product.save()
+
             sales = Sale.get_sales_from_edi_files()
             self.assertTrue(sales)
-            sale = sales[0]
-            self.assertEqual(sale.payment_term, term)
-            self.assertEqual(sale.shipment_party, customer)
-            self.assertEqual(sale.party, customer)
+            sale, = sales
+            self.assertEquals(sale.payment_term, term)
+            self.assertEquals(sale.shipment_party, customer)
+            self.assertEquals(sale.party, customer)
             self.assertTrue(sale.lines)
-            line = sale.lines[0]
-            self.assertEqual(line.product.code, product.code)
+            self.assertTrue(len(sale.lines), 3)
+            line1, line2, line3 = sale.lines
+            self.assertEquals(line1.product.code, u'67310')
+            self.assertEquals(line1.quantity, 201.0)
+            self.assertEquals(line2.product.code, u'REF1')
+            self.assertEquals(line2.quantity, 180.0)
+            self.assertEquals(line3.product.code, u'REF3')
+            self.assertEquals(line3.quantity, 100.0)
             os.rmdir(TEST_FILES_DIR)
 
 

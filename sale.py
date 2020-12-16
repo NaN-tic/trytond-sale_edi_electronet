@@ -51,9 +51,9 @@ class Sale(EdifactMixin):
         :param edi_file: EDI file to be processed.
         :template_name: File name from the file used to validate the EDI msg.
         """
-
         pool = Pool()
         SaleLine = pool.get('sale.line')
+
         control_chars = cls.set_control_chars(
             template.get('control_chars', {}))
         message = Message.from_str(response.upper().replace('\r', ''),
@@ -87,7 +87,7 @@ class Sale(EdifactMixin):
             # if some requested products can't not be selled.
             if segment.tag == u'ALI':
                 discard_if_partial_sale, errors = cls._process_ALI(
-                    segment, template)
+                    segment, template_segment)
                 if errors:
                     total_errors += errors
                 continue
@@ -326,10 +326,11 @@ class Sale(EdifactMixin):
     def _process_PRILIN(cls, segment, template):
         pool = Pool()
         SaleLine = pool.get('sale.line')
+
         field = None
-        value = segment.elements[0][2]
-        qty_value = segment.elements[0][6]
-        value = float(value)/float(qty_value)
+        value = float(segment.elements[0][2])
+        qty_value = float(segment.elements[0][6])
+        value = (value / qty_value) if qty_value > 0 else 0
         if segment.elements[0][0] ==  'AAA':
             field = 'unit_price'
         elif segment.elements[0][0] in ('AAB', 'INF'):

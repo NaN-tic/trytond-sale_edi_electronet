@@ -32,7 +32,7 @@ class TestCase(ModuleTestCase):
             company = create_company()
         with set_company(company):
             if chart:
-                create_chart(company)
+                create_chart(company, tax=True)
             if not fiscalyear:
                 fiscalyear = set_invoice_sequences(get_fiscalyear(company))
                 fiscalyear.save()
@@ -292,6 +292,7 @@ class TestCase(ModuleTestCase):
         ProductTemplate = pool.get('product.template')
         PartyIdentifier = pool.get('party.identifier')
         Product = pool.get('product.product')
+        Category = pool.get('product.category')
         Tax = pool.get('account.tax')
         Sale = pool.get('sale.sale')
         SaleConfig = pool.get('sale.configuration')
@@ -309,15 +310,17 @@ class TestCase(ModuleTestCase):
             self.create_moves(company)
             accounts = self.get_accounts(company)
             expense = accounts.get('expense')
-            revenue = accounts['revenue']
-            rate = Decimal('.10')
-            tax = Tax()
-            tax.name = 'Tax %s' % rate
-            tax.description = tax.name
-            tax.type = 'percentage'
-            tax.rate = rate
-            tax.invoice_account = accounts.get('tax')
-            tax.credit_note_account = accounts.get('tax')
+            revenue = accounts.get('revenue')
+
+            tax, = Tax.search([], limit=1)
+            category = Category()
+            category.name = 'Accounting'
+            category.accounting = True
+            category.customer_taxes = [tax]
+            category.account_expense = expense
+            category.account_revenue = revenue
+            category.save()
+
             term = self.create_payment_term()
             customer, = Party.search([
                     ('name', '=', 'customer1'),
@@ -348,9 +351,10 @@ class TestCase(ModuleTestCase):
                 template.list_price = Decimal('10')
                 template.cost_price = Decimal('5')
                 template.cost_price_method = 'fixed'
-                template.account_expense = expense
-                template.account_revenue = revenue
                 template.sale_uom = unit
+                template.account_category = category
+                template.accounts_category = True
+                template.taxes_category = True
                 template.save()
                 product.template = template
                 product.code = code
@@ -367,10 +371,13 @@ class TestCase(ModuleTestCase):
             line1, line2, line3 = sale.lines
             self.assertEquals(line1.product.code, u'67310')
             self.assertEquals(line1.quantity, 201.0)
+            self.assertTrue(line1.taxes, True)
             self.assertEquals(line2.product.code, u'REF1')
             self.assertEquals(line2.quantity, 180.0)
+            self.assertTrue(line2.taxes, True)
             self.assertEquals(line3.product.code, u'REF3')
             self.assertEquals(line3.quantity, 100.0)
+            self.assertTrue(line3.taxes, True)
             os.rmdir(TEST_FILES_DIR)
 
 

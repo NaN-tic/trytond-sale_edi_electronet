@@ -3,8 +3,7 @@
 # copyright notices and license terms.
 from trytond.pool import Pool, PoolMeta
 from trytond.modules.product import price_digits
-from edifact.errors import (
-    IncorrectValueForField, MissingFieldsError)
+from edifact.errors import (IncorrectValueForField, MissingFieldsError)
 from edifact.message import Message
 from edifact.serializer import Serializer
 from trytond.modules.edocument_unedifact.edocument import (EdifactMixin,
@@ -47,11 +46,8 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
         """
         for field in self._fields.keys():
             value = values.get(field)
-            if not value:
-                default = self._defaults.get(field)
-                if default:
-                    value = default()
-            setattr(self, field, value)
+            if value:
+                setattr(self, field, value)
         return self
 
     @classmethod
@@ -146,7 +142,12 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
         if not values or not values.get('shipment_party'):
             return NO_SALE, total_errors
 
-        sale = cls()
+        sale_default_values = cls.default_get(cls._fields.keys(),
+                with_rec_name=False)
+        line_default_values = SaleLine.default_get(SaleLine._fields.keys(),
+                with_rec_name=False)
+
+        sale = cls(**sale_default_values)
         sale.set_fields_value(values)
         sale.on_change_shipment_party()
         if not sale.party:
@@ -172,17 +173,14 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
             if (values.get('gross_unit_price', None) == 0 and
                     values.get('unit_price', None) != 0):
                 del values['gross_unit_price']
-            line = SaleLine().set_fields_value(values)
+
+            line = SaleLine(**line_default_values)
+            line.set_fields_value(values)
+            line.on_change_product()
             if values.get('gross_unit_price', None):
                 line.update_prices()
             else:
                 line.gross_unit_price = line.unit_price
-            # This fields are a required fields, we set its value to a
-            # default valuein order to the sale can be saved. No matter
-            # if it isn't the true value because it will be calculated next
-            # in the on_change_product and on_change_quantity calls.
-            if not getattr(line, 'description'):
-                line.description = line.product.rec_name
             if not getattr(line, 'unit_price'):
                 line.unit_price = ZERO_
                 line.gross_unit_price = ZERO_
@@ -431,11 +429,8 @@ class SaleLine(metaclass=PoolMeta):
         """
         for field in self._fields.keys():
             value = values.get(field)
-            if not value:
-                default = self._defaults.get(field)
-                if default:
-                    value = default()
-            setattr(self, field, value)
+            if value:
+                setattr(self, field, value)
         return self
 
     def apply_on_change_product_and_quantity(self):

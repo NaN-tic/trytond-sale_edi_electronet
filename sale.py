@@ -168,9 +168,10 @@ class Sale(EdifactMixin):
             line.set_fields_value(values)
             line.on_change_product()
             if values.get('gross_unit_price', None):
-                line.update_prices()
+                line.gross_unit_price = values['gross_unit_price']
             else:
-                line.gross_unit_price = line.unit_price
+                line.gross_unit_price = values['unit_price']
+            line.update_prices()
             # This fields are a required fields, we set its value to a
             # default valuein order to the sale can be saved. No matter
             # if it isn't the true value because it will be calculated next

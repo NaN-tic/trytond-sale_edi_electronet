@@ -178,9 +178,10 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
             line.set_fields_value(values)
             line.on_change_product()
             if values.get('gross_unit_price', None):
-                line.update_prices()
+                line.gross_unit_price = values['gross_unit_price']
             else:
-                line.gross_unit_price = line.unit_price
+                line.gross_unit_price = values['unit_price']
+            line.update_prices()
             if not getattr(line, 'unit_price'):
                 line.unit_price = ZERO_
                 line.gross_unit_price = ZERO_

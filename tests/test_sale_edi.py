@@ -227,6 +227,7 @@ class TestCase(ModuleTestCase):
                 product = Product()
                 template = ProductTemplate()
                 template.name = code
+                template.code = code
                 template.default_uom = unit
                 template.type = 'goods'
                 template.salable = True
@@ -234,11 +235,9 @@ class TestCase(ModuleTestCase):
                 template.cost_price_method = 'fixed'
                 template.account_category = category
                 template.sale_uom = unit
-                template.account_category = category
                 template.save()
                 product.template = template
                 product.cost_price = Decimal('5')
-                product.code = code
                 product.save()
 
             sales = Sale.get_sales_from_edi_files()

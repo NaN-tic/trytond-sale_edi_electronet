@@ -153,7 +153,6 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
         if not sale.party:
             sale.party = sale.shipment_party
         sale.on_change_party()
-        lines = []
         for linegroup in detail:
             values = {}
             for segment in linegroup:
@@ -176,6 +175,7 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
 
             line = SaleLine(**line_default_values)
             line.set_fields_value(values)
+            line.sale = sale
             line.on_change_product()
             if values.get('gross_unit_price', None):
                 line.gross_unit_price = values['gross_unit_price']
@@ -185,9 +185,7 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
             if not getattr(line, 'unit_price'):
                 line.unit_price = ZERO_
                 line.gross_unit_price = ZERO_
-            lines.append(line)
-        if lines:
-            sale.lines = lines
+            line.save()
         return sale, total_errors
 
     @classmethod

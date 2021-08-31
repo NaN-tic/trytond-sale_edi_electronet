@@ -182,8 +182,8 @@ class TestCase(ModuleTestCase):
         shutil.copy(test_fname, TEST_FILES_DIR)
 
         company = create_company()
-        currency = create_currency('EUR')
-        add_currency_rate(currency, 1)
+        # currency = create_currency('EUR')
+        # add_currency_rate(currency, 1)
         with set_company(company):
             self.create_fiscalyear_and_chart(company, None,
                 True)

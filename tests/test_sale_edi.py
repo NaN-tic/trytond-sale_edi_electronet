@@ -210,7 +210,7 @@ class TestCase(ModuleTestCase):
             customer.customer_payment_term = term
             customer.save()
             identifier = PartyIdentifier()
-            identifier.type = 'edi'
+            identifier.type = 'edi_head'
             identifier.code = 'PUNTO_VENTA'
             identifier.party = customer
             identifier.save()

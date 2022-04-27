@@ -1,14 +1,14 @@
-# The COPYRIGHT file at the top level of this repository contains the full
-# copyright notices and license terms.
-import unittest
+
+# This file is part of Tryton.  The COPYRIGHT file at the top level of
+# this repository contains the full copyright notices and license terms.
+
 import os
 import shutil
-import trytond.tests.test_tryton
 from trytond.tests.test_tryton import ModuleTestCase, with_transaction
 from trytond.pool import Pool
 from trytond.transaction import Transaction
-from trytond.modules.company.tests import create_company, set_company
-from trytond.modules.currency.tests import create_currency, add_currency_rate
+from trytond.modules.company.tests import (create_company, set_company,
+    CompanyTestMixin)
 from trytond.modules.account.tests import create_chart, get_fiscalyear
 from trytond.modules.account_invoice.tests import set_invoice_sequences
 from decimal import Decimal
@@ -19,8 +19,8 @@ TEST_FILES_DIR = os.path.abspath(
 TEST_FILES_EXTENSION = '.txt'
 
 
-class TestCase(ModuleTestCase):
-    'Test module'
+class SaleEdiTestCase(CompanyTestMixin, ModuleTestCase):
+    'Test SaleEdi module'
     module = 'sale_edi'
 
     def create_fiscalyear_and_chart(self, company=None, fiscalyear=None,
@@ -261,7 +261,4 @@ class TestCase(ModuleTestCase):
             os.rmdir(TEST_FILES_DIR)
 
 
-def suite():
-    suite = trytond.tests.test_tryton.suite()
-    suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestCase))
-    return suite
+del ModuleTestCase

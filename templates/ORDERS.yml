@@ -5,7 +5,7 @@ header:
     CTA: ['IC', '!value']
     COM: [['!value', '', '!value']]
     #RFF: [['ON', '!ignore', '!value']]
-    NAD: [!!python/tuple ['BY', 'SU', 'DP', 'MS'], ['!value']]
+    NAD: [!!python/tuple ['BY', 'SU', 'DP', 'MS', 'MR'], ['!value']]
     CUX: [['2', '', '!value', '', '!ignore']]
 detail:
     #LIN: ['!ignore', '', ['!value', '', 'EN']]

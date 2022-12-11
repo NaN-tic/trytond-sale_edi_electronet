@@ -67,7 +67,7 @@ class Sale(EdifactMixin):
                     start='BGM', end='LIN'))]
         detail = [x for x in separate_section(segments_iterator, start='LIN',
                 end='UNS')]
-        del(segments_iterator)
+        del (segments_iterator)
 
         total_errors = []
         discard_if_partial_sale = False
@@ -243,6 +243,7 @@ class Sale(EdifactMixin):
         if segment.elements[0] in (u'MS', u'BY'):
             edi_operational_point = segment.elements[1][0]
             identifiers = PartyIdentifier.search([
+                    ('party.active', '=', True),
                     ('type', '=', 'edi'),
                     ('code', 'ilike', edi_operational_point)])
             if not identifiers:
@@ -257,6 +258,8 @@ class Sale(EdifactMixin):
             else:
                 field = 'edi_ean'
             address, = Address.search([
+                    ('active', '=', True),
+                    ('party.active', '=', True),
                     (field, 'ilike', edi_operational_point)
                     ], limit=1) or [None]
 
@@ -334,7 +337,7 @@ class Sale(EdifactMixin):
         value = float(segment.elements[0][2])
         qty_value = float(segment.elements[0][6])
         value = (value / qty_value) if qty_value > 0 else 0
-        if segment.elements[0][0] ==  'AAA':
+        if segment.elements[0][0] == 'AAA':
             field = 'unit_price'
         elif segment.elements[0][0] in ('AAB', 'INF'):
             # If the model SaleLine doesn't have the field gross_unit_price

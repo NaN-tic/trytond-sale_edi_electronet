@@ -11,4 +11,4 @@ def register():
         sale.Sale,
         sale.SaleLine,
         sale.Cron,
-        module='sale_edi', type_='model')
+        module='sale_edi_electronet', type_='model')

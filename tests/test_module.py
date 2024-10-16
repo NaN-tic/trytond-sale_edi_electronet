@@ -15,13 +15,13 @@ from decimal import Decimal
 
 
 TEST_FILES_DIR = os.path.abspath(
-    'trytond/trytond/modules/sale_edi/tests/data/tmp')
+    'trytond/trytond/modules/sale_edi_electronet/tests/data/tmp')
 TEST_FILES_EXTENSION = '.txt'
 
 
-class SaleEdiTestCase(CompanyTestMixin, ModuleTestCase):
-    'Test SaleEdi module'
-    module = 'sale_edi'
+class SaleEdiElectronetTestCase(CompanyTestMixin, ModuleTestCase):
+    'Test Sale Edi Electronet module'
+    module = 'sale_edi_electronet'
 
     def create_fiscalyear_and_chart(self, company=None, fiscalyear=None,
             chart=True):
@@ -177,7 +177,7 @@ class SaleEdiTestCase(CompanyTestMixin, ModuleTestCase):
 
         if not os.path.exists(TEST_FILES_DIR):
             os.mkdir(TEST_FILES_DIR)
-        test_fname = ('trytond/trytond/modules/sale_edi/tests/data/order' +
+        test_fname = ('trytond/trytond/modules/sale_edi_electronet/tests/data/order' +
             TEST_FILES_EXTENSION)
         shutil.copy(test_fname, TEST_FILES_DIR)
 

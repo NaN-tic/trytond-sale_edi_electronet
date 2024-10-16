@@ -240,7 +240,8 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
         if segment.elements[0] in ('MS', 'BY'):
             edi_operational_point = segment.elements[1][0]
             identifiers = PartyIdentifier.search([
-                    ('type', '=', 'edi_head'),
+                    ('party.active', '=', True),
+                    ('type', '=', 'edi'),
                     ('code', 'ilike', edi_operational_point)])
             if not identifiers:
                 serialized_segment = serializer.serialize([segment])
@@ -254,6 +255,8 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
             else:
                 field = 'edi_ean'
             address, = Address.search([
+                    ('active', '=', True),
+                    ('party.active', '=', True),
                     (field, 'ilike', edi_operational_point)
                     ], limit=1) or [None]
 
@@ -331,7 +334,7 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
         value = float(segment.elements[0][2])
         qty_value = float(segment.elements[0][6])
         value = (value / qty_value) if qty_value > 0 else 0
-        if segment.elements[0][0] ==  'AAA':
+        if segment.elements[0][0] == 'AAA':
             field = 'unit_price'
         elif segment.elements[0][0] in ('AAB', 'INF'):
             # If the model SaleLine doesn't have the field base_price
@@ -352,9 +355,13 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
         SaleLine = pool.get('sale.line')
         field = None
         discount = Decimal(segment.elements[0][2]) / 100
+        # If the model SaleLine doesn't have the field discount1 means
+        # the module sale_3_discounts was not installed.
+        if hasattr(SaleLine, 'discount1'):
+            field = 'discount1'
         # If the model SaleLine doesn't have the field discount means
         # the module sale_discount was not installed.
-        if hasattr(SaleLine, 'discount'):
+        elif hasattr(SaleLine, 'discount'):
             field = 'discount'
         else:
             return DO_NOTHING, NO_ERRORS

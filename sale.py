@@ -166,22 +166,18 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
                     values.update(to_update)
             if errors:
                 continue
-            if (values.get('gross_unit_price', None) == 0 and
+            if (values.get('base_price', None) == 0 and
                     values.get('unit_price', None) != 0):
-                del values['gross_unit_price']
+                del values['base_price']
 
             line = SaleLine(**line_default_values)
             line.set_fields_value(values)
             line.sale = sale
             line.on_change_product()
-            if values.get('gross_unit_price', None):
-                line.gross_unit_price = values.get('gross_unit_price', ZERO_)
-            else:
-                line.gross_unit_price = values.get('unit_price', ZERO_)
-            line.update_prices()
+            if values.get('base_price', None):
+                line.base_price = values.get('base_price', ZERO_)
             if not getattr(line, 'unit_price'):
                 line.unit_price = ZERO_
-                line.gross_unit_price = ZERO_
             line.save()
         return sale, total_errors
 
@@ -338,10 +334,10 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
         if segment.elements[0][0] ==  'AAA':
             field = 'unit_price'
         elif segment.elements[0][0] in ('AAB', 'INF'):
-            # If the model SaleLine doesn't have the field gross_unit_price
+            # If the model SaleLine doesn't have the field base_price
             # means the module sale_discount was not installed.
-            if hasattr(SaleLine, 'gross_unit_price'):
-                field = 'gross_unit_price'
+            if hasattr(SaleLine, 'base_price'):
+                field = 'base_price'
             else:
                 field = 'unit_price'
         if not field:

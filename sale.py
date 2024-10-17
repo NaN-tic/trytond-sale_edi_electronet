@@ -355,13 +355,9 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
         SaleLine = pool.get('sale.line')
         field = None
         discount = Decimal(segment.elements[0][2]) / 100
-        # If the model SaleLine doesn't have the field discount1 means
-        # the module sale_3_discounts was not installed.
-        if hasattr(SaleLine, 'discount1'):
-            field = 'discount1'
         # If the model SaleLine doesn't have the field discount means
         # the module sale_discount was not installed.
-        elif hasattr(SaleLine, 'discount'):
+        if hasattr(SaleLine, 'discount'):
             field = 'discount'
         else:
             return DO_NOTHING, NO_ERRORS

@@ -241,7 +241,7 @@ class Sale(EdifactMixin, metaclass=PoolMeta):
             edi_operational_point = segment.elements[1][0]
             identifiers = PartyIdentifier.search([
                     ('party.active', '=', True),
-                    ('type', '=', 'edi'),
+                    ('type', '=', 'edi_head'),
                     ('code', 'ilike', edi_operational_point)])
             if not identifiers:
                 serialized_segment = serializer.serialize([segment])

@@ -7,6 +7,7 @@ import shutil
 from trytond.tests.test_tryton import ModuleTestCase, with_transaction
 from trytond.pool import Pool
 from trytond.transaction import Transaction
+from trytond.modules.currency.tests import create_currency
 from trytond.modules.company.tests import (create_company, set_company,
     CompanyTestMixin)
 from trytond.modules.account.tests import create_chart, get_fiscalyear
@@ -181,8 +182,8 @@ class SaleEdiElectronetTestCase(CompanyTestMixin, ModuleTestCase):
             TEST_FILES_EXTENSION)
         shutil.copy(test_fname, TEST_FILES_DIR)
 
-        company = create_company()
-        # currency = create_currency('EUR')
+        currency = create_currency('EUR')
+        company = create_company(currency=currency)
         # add_currency_rate(currency, 1)
         with set_company(company):
             self.create_fiscalyear_and_chart(company, None,

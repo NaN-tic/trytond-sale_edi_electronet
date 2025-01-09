@@ -44,23 +44,26 @@ class SaleEdiElectronetTestCase(CompanyTestMixin, ModuleTestCase):
         pool = Pool()
         Account = pool.get('account.account')
         accounts = {}
-        accounts['receivable'] = Account.search([
+        accounts['receivable'], = Account.search([
             ('type.receivable', '=', True),
             ('company', '=', company.id),
-            ])[0]
-        accounts['payable'] = Account.search([
+            ('closed', '=', False),
+            ], limit=1)
+        accounts['payable'], = Account.search([
             ('type.payable', '=', True),
             ('company', '=', company.id),
-            ])[0]
-
-        accounts['revenue'] = Account.search([
+            ('closed', '=', False),
+            ], limit=1)
+        accounts['revenue'], = Account.search([
             ('type.revenue', '=', True),
             ('company', '=', company.id),
-            ])[0]
-        accounts['expense'] = Account.search([
+            ('closed', '=', False),
+            ], limit=1)
+        accounts['expense'], = Account.search([
             ('type.expense', '=', True),
             ('company', '=', company.id),
-            ])[0]
+            ('closed', '=', False),
+            ], limit=1)
 
         root, = Account.search([
                 ('parent', '=', None),
@@ -84,12 +87,12 @@ class SaleEdiElectronetTestCase(CompanyTestMixin, ModuleTestCase):
             accounts['payable'].code = '41'
             accounts['payable'].save()
         cash, = Account.search([
-                ('name', '=', 'Main Cash'),
+                ('code', '=', '1.1.1'), # Main Cash
                 ('company', '=', company.id),
                 ], limit=1)
         accounts['cash'] = cash
         tax, = Account.search([
-                ('name', '=', 'Main Tax'),
+                ('code', '=', '6.3.6'), # Main Tax
                 ('company', '=', company.id),
                 ], limit=1)
         accounts['tax'] = tax

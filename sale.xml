@@ -15,8 +15,9 @@
             <field name="user" ref="user_create_edi_orders"/>
             <field name="group" ref="res.group_admin"/>
         </record>
+    </data>
+    <data noupdate="1">
         <record model="ir.cron" id="cron_create_edi_orders">
-            <field name="active" eval="True"/>
             <field name="interval_number" eval="1"/>
             <field name="interval_type">days</field>
             <field name="method">sale.sale|get_sales_from_edi_files_cron</field>

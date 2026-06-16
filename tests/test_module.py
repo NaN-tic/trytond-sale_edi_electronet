@@ -2,8 +2,8 @@
 # This file is part of Tryton.  The COPYRIGHT file at the top level of
 # this repository contains the full copyright notices and license terms.
 
-import os
 import shutil
+import tempfile
 from trytond.tests.test_tryton import ModuleTestCase, with_transaction
 from trytond.pool import Pool
 from trytond.transaction import Transaction
@@ -14,9 +14,6 @@ from trytond.modules.account.tests import create_chart, get_fiscalyear
 from trytond.modules.account_invoice.tests import set_invoice_sequences
 from decimal import Decimal
 
-
-TEST_FILES_DIR = os.path.abspath(
-    'trytond/trytond/modules/sale_edi_electronet/tests/data/tmp')
 TEST_FILES_EXTENSION = '.txt'
 
 
@@ -179,90 +176,91 @@ class SaleEdiElectronetTestCase(CompanyTestMixin, ModuleTestCase):
         Sale = pool.get('sale.sale')
         SaleConfig = pool.get('sale.configuration')
 
-        if not os.path.exists(TEST_FILES_DIR):
-            os.mkdir(TEST_FILES_DIR)
+        test_files_dir = tempfile.mkdtemp(prefix='sale_edi_electronet_')
         test_fname = ('trytond/trytond/modules/sale_edi_electronet/tests/data/order' +
             TEST_FILES_EXTENSION)
-        shutil.copy(test_fname, TEST_FILES_DIR)
+        shutil.copy(test_fname, test_files_dir)
 
-        currency = create_currency('EUR')
-        company = create_company(currency=currency)
-        # add_currency_rate(currency, 1)
-        with set_company(company):
-            self.create_fiscalyear_and_chart(company, None,
-                True)
-            # Create some parties
-            customer1, customer2, supplier1, supplier2 = self.create_parties(
-                company)
-            accounts = self.get_accounts(company)
-            expense = accounts.get('expense')
-            revenue = accounts.get('revenue')
+        try:
+            currency = create_currency('EUR')
+            company = create_company(currency=currency)
+            # add_currency_rate(currency, 1)
+            with set_company(company):
+                self.create_fiscalyear_and_chart(company, None,
+                    True)
+                # Create some parties
+                customer1, customer2, supplier1, supplier2 = self.create_parties(
+                    company)
+                accounts = self.get_accounts(company)
+                expense = accounts.get('expense')
+                revenue = accounts.get('revenue')
 
-            tax, = Tax.search([], limit=1)
-            category = Category()
-            category.name = 'Accounting'
-            category.accounting = True
-            category.customer_taxes = [tax]
-            category.account_expense = expense
-            category.account_revenue = revenue
-            category.save()
+                tax, = Tax.search([], limit=1)
+                category = Category()
+                category.name = 'Accounting'
+                category.accounting = True
+                category.customer_taxes = [tax]
+                category.account_expense = expense
+                category.account_revenue = revenue
+                category.save()
 
-            term = self.create_payment_term()
-            customer, = Party.search([
-                    ('name', '=', 'customer1'),
-                    ], limit=1)
-            customer.customer_payment_term = term
-            customer.save()
-            identifier = PartyIdentifier()
-            identifier.type = 'edi_head'
-            identifier.code = 'PUNTO_VENTA'
-            identifier.party = customer
-            identifier.save()
-            address, = customer.addresses
-            address.edi_ean = 'PUNTO_VENTA'
-            address.save()
-            sale_cfg = SaleConfig(1)
-            sale_cfg.edi_source_path = os.path.abspath(TEST_FILES_DIR)
-            sale_cfg.save()
+                term = self.create_payment_term()
+                customer, = Party.search([
+                        ('name', '=', 'customer1'),
+                        ], limit=1)
+                customer.customer_payment_term = term
+                customer.save()
+                identifier = PartyIdentifier()
+                identifier.type = 'edi_head'
+                identifier.code = 'PUNTO_VENTA'
+                identifier.party = customer
+                identifier.save()
+                address, = customer.addresses
+                address.edi_ean = 'PUNTO_VENTA'
+                address.save()
+                sale_cfg = SaleConfig(1)
+                sale_cfg.edi_source_path = test_files_dir
+                sale_cfg.save()
 
-            unit, = ProductUom.search([('name', '=', 'Unit')], limit=1)
+                unit, = ProductUom.search([('name', '=', 'Unit')], limit=1)
 
-            for code in ('67310', 'REF1', 'REF3'):
-                product = Product()
-                template = ProductTemplate()
-                template.name = code
-                template.code = code
-                template.default_uom = unit
-                template.type = 'goods'
-                template.salable = True
-                template.list_price = Decimal('10')
-                template.cost_price_method = 'fixed'
-                template.account_category = category
-                template.sale_uom = unit
-                template.save()
-                product.template = template
-                product.cost_price = Decimal('5')
-                product.save()
+                for code in ('67310', 'REF1', 'REF3'):
+                    product = Product()
+                    template = ProductTemplate()
+                    template.name = code
+                    template.code = code
+                    template.default_uom = unit
+                    template.type = 'goods'
+                    template.salable = True
+                    template.list_price = Decimal('10')
+                    template.cost_price_method = 'fixed'
+                    template.account_category = category
+                    template.sale_uom = unit
+                    template.save()
+                    product.template = template
+                    product.cost_price = Decimal('5')
+                    product.save()
 
-            sales = Sale.get_sales_from_edi_files()
-            self.assertTrue(sales)
-            sale, = sales
-            self.assertEqual(sale.payment_term, term)
-            self.assertEqual(sale.shipment_party, customer)
-            self.assertEqual(sale.party, customer)
-            self.assertTrue(sale.lines)
-            self.assertTrue(len(sale.lines), 3)
-            line1, line2, line3 = sale.lines
-            self.assertEqual(line1.product.code, u'67310')
-            self.assertEqual(line1.quantity, 201.0)
-            self.assertTrue(line1.taxes, True)
-            self.assertEqual(line2.product.code, u'REF1')
-            self.assertEqual(line2.quantity, 180.0)
-            self.assertTrue(line2.taxes, True)
-            self.assertEqual(line3.product.code, u'REF3')
-            self.assertEqual(line3.quantity, 100.0)
-            self.assertTrue(line3.taxes, True)
-            os.rmdir(TEST_FILES_DIR)
+                sales = Sale.get_sales_from_edi_files()
+                self.assertTrue(sales)
+                sale, = sales
+                self.assertEqual(sale.payment_term, term)
+                self.assertEqual(sale.shipment_party, customer)
+                self.assertEqual(sale.party, customer)
+                self.assertTrue(sale.lines)
+                self.assertTrue(len(sale.lines), 3)
+                line1, line2, line3 = sale.lines
+                self.assertEqual(line1.product.code, u'67310')
+                self.assertEqual(line1.quantity, 201.0)
+                self.assertTrue(line1.taxes, True)
+                self.assertEqual(line2.product.code, u'REF1')
+                self.assertEqual(line2.quantity, 180.0)
+                self.assertTrue(line2.taxes, True)
+                self.assertEqual(line3.product.code, u'REF3')
+                self.assertEqual(line3.quantity, 100.0)
+                self.assertTrue(line3.taxes, True)
+        finally:
+            shutil.rmtree(test_files_dir)
 
 
 del ModuleTestCase
